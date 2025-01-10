@@ -5,43 +5,64 @@ import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
 const registerUser = asyncHandler(async (req, res) => {
-  const { fullName, email, userName, password } = req.body;
+  const { fullname, email, username, password } = req.body;
 
   // validation
   if (
-    [fullName, email, userName, password].some((field) => field?.trim() === "")
+    [fullname, email, username, password].some((field) => field?.trim() === "")
   ) {
     throw new ApiError(400, "All fields are required");
   }
 
   const existedUser = await User.findOne({
-    $or: [{ email }, { userName }],
+    $or: [{ email }, { username }],
   });
   if (existedUser) {
     throw new ApiError(409, "User with email or username  already exists");
   }
-
-  const avatarLocalPath = req.files?.avatar[0]?.path;
-  const coverImageLocalpath = req.files?.coverImage[0]?.path;
+  console.warn("req.files", req.files);
+  const avatarLocalPath = req.files?.avatar?.[0]?.path;
+  const coverImageLocalpath = req.files?.coverImage?.[0]?.path;
 
   if (!avatarLocalPath) {
     throw new ApiError(400, "Avatar file is missing");
   }
-  const avatar = await uploadOnCloudinary(avatarLocalPath);
-  if (!coverImageLocalpath) {
-    throw new ApiError(400, "Cover Image file is missing");
+
+  // const avatar = await uploadOnCloudinary(avatarLocalPath);
+  // if (!coverImageLocalpath) {
+  //   throw new ApiError(400, "Cover Image file is missing");
+  // }
+  // const coverImage = await uploadOnCloudinary(coverImageLocalpath);
+
+  let avatar;
+  try {
+    avatar = await uploadOnCloudinary(avatarLocalPath);
+    console.log("Avatar uploaded to cloudinary", avatar);
+  } catch (err) {
+    console.log("Error uploading avatar to cloudinary", err);
+    throw new ApiError(500, "failed to upload avatar");
   }
-  const coverImage = await uploadOnCloudinary(coverImageLocalpath);
+
+  let coverImage;
+  if (coverImageLocalpath) {
+    try {
+      coverImage = await uploadOnCloudinary(coverImageLocalpath);
+      console.log("Cover Image uploaded to cloudinary", coverImage);
+    } catch (err) {
+      console.log("Error uploading coverImage to cloudinary", err);
+      throw new ApiError(500, "failed to upload coverImage");
+    }
+  }
 
   const user = await User.create({
-    fullName,
+    fullname,
     email,
-    userName: userName.toLowerCase(),
+    username: username.toLowerCase(),
     password,
     avatar: avatar.url,
-    coverImage: coverImage?.url,
+    coverImage: coverImage?.url || "",
   });
-//   check if user is created or not 
+  //   check if user is created or not
   const createdUser = await User.findById(user._id).select(
     "-password -refreshToken"
   );
